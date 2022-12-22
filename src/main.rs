@@ -1,52 +1,46 @@
-use std::fs::File;
+use sha2::{Sha256, Digest};
 
-// main function
+mod file_utils;
+
+/**
+ * Main function
+ *
+ * 1. Parse the command line arguments
+ * 2. Decide whether to process a file or a directory
+ * 3. Decide whether to output to a file or a directory
+ * 4. Run the process based on input/output types.
+ */
 fn main() {
-    print_file_or_dir("src");
-}
+// parse the command line argument
+    let _args: Vec<String> = std::env::args().skip(1).collect();
 
-fn get_file(filename: &str) -> Option<File> {
-    let file = File::open(filename);
-    match file {
-        Ok(file) => Some(file),
-        Err(error) => {
-            println!("Error: {}", error);
-            None
-        }
-    }
-}
-
-// create an enum for file, directory, or neither
-enum FileType {
-    File,
-    Directory,
-    Neither,
-}
-
-// get the file type
-fn get_file_type(filename: &str) -> FileType {
-    let file = get_file(filename);
-    match file {
-        Some(file) => {
-            let metadata = file.metadata().unwrap();
-            if metadata.is_file() {
-                FileType::File
-            } else if metadata.is_dir() {
-                FileType::Directory
-            } else {
-                FileType::Neither
-            }
+    match file_utils::get_file_type("src/main.rs") {
+        file_utils::FileType::File => {
+            let contents = file_utils::read_file_contents("src/main.rs").unwrap();
+            println!("{}", get_hash(&contents));
         },
-        None => FileType::Neither
+        file_utils::FileType::Directory => println!("Directory"),
+        file_utils::FileType::Neither => println!("Neither"),
     }
 }
 
-// if optional file then match the file_type 
-fn print_file_or_dir(filename: &str) {
-    let file_type = get_file_type(filename);
-    match file_type {
-        FileType::File => println!("File: {}", filename),
-        FileType::Directory => println!("Directory: {}", filename),
-        FileType::Neither => println!("Neither: {}", filename),
-    }
+fn get_hash(contents: &str) -> String {    
+    let mut hasher = Sha256::new();
+    hasher.update(contents);
+    format!("{:x}", hasher.finalize())
 }
+
+// // structure with origin path, output path, filename, origin hash and output hash
+// struct Metadata {
+//     origin_path: String,
+//     output_path: String,
+//     filename: String,
+//     origin_hash: String,
+//     output_hash: String,
+// }
+
+// // structure with metadata and contents, both mutable
+// struct ProcessData {
+//     metadata: Metadata,
+//     contents: String,
+// }
