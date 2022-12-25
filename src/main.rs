@@ -1,6 +1,27 @@
-use sha2::{Sha256, Digest};
+use std::fs;
 
-mod file_utils;
+/// Given a path, return Some(File) if it's a directory; None if it's not.
+/// 
+///     assert_eq!(get_dir("src"), Some(File));
+pub fn get_dir(path: &str) -> Option<fs::File> {
+    let dir = fs::File::open(path);
+    match dir {
+        Ok(dir) => {
+            // make sure it's a directory
+            let metadata = dir.metadata().unwrap();
+            if metadata.is_dir() {
+                Some(dir)
+            } else {
+                println!("Error: {} is not a directory", path);
+                None
+            }
+        }
+        Err(error) => {
+            println!("Error accessing path: {}", error);
+            None
+        }
+    }
+}
 
 /**
  * Main function
@@ -12,35 +33,7 @@ mod file_utils;
  */
 fn main() {
 // parse the command line argument
-    let _args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<String> = std::env::args().skip(1).collect();
 
-    match file_utils::get_file_type("src/main.rs") {
-        file_utils::FileType::File => {
-            let contents = file_utils::read_file_contents("src/main.rs").unwrap();
-            println!("{}", get_hash(&contents));
-        },
-        file_utils::FileType::Directory => println!("Directory"),
-        file_utils::FileType::Neither => println!("Neither"),
-    }
+    let _files = args.iter().map(|arg| get_dir(arg)).collect::<Vec<_>>();
 }
-
-fn get_hash(contents: &str) -> String {    
-    let mut hasher = Sha256::new();
-    hasher.update(contents);
-    format!("{:x}", hasher.finalize())
-}
-
-// // structure with origin path, output path, filename, origin hash and output hash
-// struct Metadata {
-//     origin_path: String,
-//     output_path: String,
-//     filename: String,
-//     origin_hash: String,
-//     output_hash: String,
-// }
-
-// // structure with metadata and contents, both mutable
-// struct ProcessData {
-//     metadata: Metadata,
-//     contents: String,
-// }
