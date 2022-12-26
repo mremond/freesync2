@@ -1,23 +1,17 @@
 use std::fs;
 
-/// Given a path, return Some(File) if it's a directory; None if it's not.
-/// 
-///     assert_eq!(get_dir("src"), Some(File));
-pub fn get_dir(path: &str) -> Option<fs::File> {
-    let dir = fs::File::open(path);
-    match dir {
-        Ok(dir) => {
-            // make sure it's a directory
-            let metadata = dir.metadata().unwrap();
+/// Take a path and check if it points to a valid directory.
+fn valid_dir(path: &str) -> Option<String> {
+    let metadata = fs::metadata(path);
+    match metadata {
+        Ok(metadata) => {
             if metadata.is_dir() {
-                Some(dir)
+                Some(path.to_string())
             } else {
-                println!("Error: {} is not a directory", path);
                 None
             }
-        }
-        Err(error) => {
-            println!("Error accessing path: {}", error);
+        },
+        Err(_) => {
             None
         }
     }
@@ -32,8 +26,20 @@ pub fn get_dir(path: &str) -> Option<fs::File> {
  * 4. Run the process based on input/output types.
  */
 fn main() {
-// parse the command line argument
+    // get the command line arguments
     let args: Vec<String> = std::env::args().skip(1).collect();
 
-    let _files = args.iter().map(|arg| get_dir(arg)).collect::<Vec<_>>();
+    match args.as_slice() {
+        [input, output] => {
+            match (valid_dir(input), valid_dir(output)) {
+                (Some(input), Some(output)) => {
+                    println!("Processing directory {} to directory {}", input, output);
+                },
+                _ => ()
+            }
+        },
+        _ => {
+            println!("Usage: ./freesync2 <input> <output>");
+        }
+    }
 }
