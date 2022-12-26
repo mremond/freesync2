@@ -1,7 +1,7 @@
 use std::fs;
 use uuid::Uuid;
 
-/// Take a path and check if it points to a valid directory.
+// Take a path and check if it points to a valid directory.
 fn valid_dir(path: &str) -> Option<String> {
     println!("Checking path: {}", path);
     let metadata = fs::metadata(path);
@@ -57,10 +57,9 @@ struct Note {
     content: String
 }
 
-#[allow(unused)]
 fn read_file(path: &str) -> Option<Note> {
     println!("Reading file: {}", path);
-    let mut title: String = String::new();
+
     // read file contents into a string
     let content = fs::read_to_string(path).expect("Something went wrong reading the file");
 
@@ -83,6 +82,17 @@ fn read_file(path: &str) -> Option<Note> {
     Some(Note{title: t, content: content})
 }
 
+// output a new file base on path, filename, and contents
+fn write_file(path: &str, title: &str, contents: &str) {
+    let full_path = format!("{}/{}.md", path, title);
+    println!("Writing file: {}", full_path);
+
+    match fs::write(full_path, contents) {
+        Ok(_) => println!("File written successfully"),
+        Err(err) => println!("Error: {}", err)
+    };
+}
+
 fn main() {
     // get the command line arguments
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -98,8 +108,7 @@ fn main() {
                     for note in notes {
                         match note {
                             Some(note) => {
-                                println!("Title: {}", note.title);
-                                println!("Content: {}", note.content);
+                                write_file(&output, &note.title, &note.content);
                             },
                             None => ()
                         }
