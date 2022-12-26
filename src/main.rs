@@ -101,10 +101,22 @@ fn content_diff(old: &str, new: &str) -> Option<String> {
     }
 }
 
+fn check_title_chars(title: &str) -> String {
+    title.replace("*", "_")
+         .replace("\"", "_")
+         .replace("\\", "_")
+         .replace("/", "_")
+         .replace("<", "_")
+         .replace("<", "_")
+         .replace(">", "_")
+         .replace(":", "_")
+         .replace("|", "_")
+         .replace("?", "_")
+}
+
 // output a new file base on path, filename, and contents
 fn write_file(path: &str, title: &str, contents: &str) {
-    // TODO: If the title has invalid characters, replace them with an underscore.
-    let full_path = format!("{}{}.md", path, title);
+    let full_path = format!("{}{}.md", path, check_title_chars(title));
     println!("Writing file: {}", full_path);
 
     // check if the file already exists and append if so.
