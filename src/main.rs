@@ -230,9 +230,7 @@ fn test_check_title_chars() {
 fn write_file(path: &str, title: &str, contents: &str) {
     let full_path = format!("{}{}.md", path, check_title_chars(title));
     println!("Writing file: {}", full_path);
-
-    // TODO: Refactor append logic to be more testable.
-
+    
     // check if the file already exists and append if so.
     if std::path::Path::new(&full_path).exists() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
