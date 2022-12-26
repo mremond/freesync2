@@ -27,22 +27,24 @@ fn read_dir(path: &str) -> Vec<String> {
     println!("Reading files in directory: {}", path);
     let mut files: Vec<String> = Vec::new();
 
-    if let Some(entries) = fs::read_dir(path).ok() {
-        for entry in entries {
-            if let Some(entry) = entry.ok() {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Some(file_name) = path.file_name() {
-                        if let Some(file_name) = file_name.to_str() {
-                            if file_name.ends_with(".txt") {
-                                if let Ok(full_path) = path.canonicalize() {
-                                    println!("Path: {:?}", full_path);
-                                    files.push(full_path.to_str().unwrap().to_string());
-                                }
-                            }
-                        }
-                    }
+    for entry in fs::read_dir(path).expect("Could not read directory") {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            println!("Evaluating path: {:?}", path);
+            if path.is_file() {
+                let file_name = 
+                    path.file_name().expect("Could not get file name")
+                        .to_str().expect("Could not convert to string.");
+
+                if file_name.ends_with(".txt") {
+                    let full_path = path.canonicalize().expect("Could not get full path");
+                    println!("Path: {:?}", full_path);
+                    files.push(full_path.to_str().unwrap().to_string());
+                } else {
+                    println!("Path is not a text file.");
                 }
+            } else {
+                println!("Path is not a file.");
             }
         }
     }
@@ -51,7 +53,6 @@ fn read_dir(path: &str) -> Vec<String> {
     files
 }
 
-#[allow(unused)]
 struct Note {
     title: String,
     content: String
@@ -70,12 +71,16 @@ fn read_file(path: &str) -> Option<Note> {
             let t = first_line[2..].to_string();
             println!("Found a title: {}", t);
 
+            // TODO: check if the title is a valid regex.
+
             return Some(Note{                
                 title: t,
                 content: lines[1..].join("\n")
             })
         }
     }
+
+    // TODO: This creates endless files. Use the original file name instead.
 
     let t = Uuid::new_v4().to_string();
     println!("No title found, generating a random one: {}", t);
@@ -84,8 +89,10 @@ fn read_file(path: &str) -> Option<Note> {
 
 // output a new file base on path, filename, and contents
 fn write_file(path: &str, title: &str, contents: &str) {
-    let full_path = format!("{}/{}.md", path, title);
+    let full_path = format!("{}{}.md", path, title);
     println!("Writing file: {}", full_path);
+
+    // TODO: check if the file already exists and append if so.
 
     match fs::write(full_path, contents) {
         Ok(_) => println!("File written successfully"),
