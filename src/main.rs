@@ -1,5 +1,4 @@
 use std::fs;
-use uuid::Uuid;
 
 // Take a path and check if it points to a valid directory.
 fn valid_dir(path: &str) -> Option<String> {
@@ -82,8 +81,13 @@ fn read_file(path: &str) -> Option<Note> {
 
     // TODO: This creates endless files. Use the original file name instead.
 
-    let t = Uuid::new_v4().to_string();
-    println!("No title found, generating a random one: {}", t);
+    // get file name from path
+    let file_name = 
+        std::path::Path::new(path).file_name().expect("Could not get file name")
+            .to_str().expect("Could not convert to string.");
+    let end = file_name.len() - ".txt".len();
+    let t = file_name[..end].to_string();
+    println!("No title found, using the original one: {}", t);
     Some(Note{title: t, content: content})
 }
 
