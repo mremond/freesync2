@@ -7,6 +7,15 @@ A personal utility to move files from my [freewrite](https://getfreewrite.com) t
 ./freesync2 <input> <output>
 ```
 
+## Deploy
+```
+cargo build --release
+```
+
+```
+sudo cp target/release/freesync2 /usr/local/bin/
+```
+
 ## Features
 1. Iterates files in the input directory and moves to output directory.
 2. Detect markdown titles and change the name in the outdir.
