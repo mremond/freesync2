@@ -74,18 +74,13 @@ fn read_dir(path: &str) -> Vec<String> {
     files
 }
 
+#[derive(PartialEq, Debug)]
 struct Note {
     title: String,
     content: String
 }
 
-fn read_file(path: &str) -> Option<Note> {
-    println!("Reading file: {}", path);
-
-    // read file contents into a string
-    let content = fs::read_to_string(path).expect("Something went wrong reading the file");
-
-    // break content by lines
+fn find_content_title(content: &str) -> Option<Note> {
     let lines: Vec<&str> = content.lines().collect();
     if let Some(first_line) = lines.first() {
         if first_line.starts_with("# ") {
@@ -98,16 +93,60 @@ fn read_file(path: &str) -> Option<Note> {
             })
         }
     }
+    None
+}
 
-    // get file name from path
-    let file_name = 
-        std::path::Path::new(path)
-            .file_name().expect("Could not get file name")
-            .to_str().expect("Could not convert to string.");
-    let end = file_name.len() - ".txt".len();
-    let t = file_name[..end].to_string();
-    println!("No title found, using the original one: {}", t);
-    Some(Note{title: t, content: content})
+#[test]
+fn test_blank_content() {
+    assert_eq!(find_content_title(""), None);
+}
+
+#[test]
+fn test_no_title() {
+    assert_eq!(find_content_title("Hello World"), None);
+}
+
+#[test]
+fn test_title() {
+    assert_eq!(find_content_title("# My Title"), Some(Note{title: "My Title".to_string(), content: "".to_string()}));
+    assert_eq!(find_content_title("# My Title\nAnd my content."), Some(Note{title: "My Title".to_string(), content: "And my content.".to_string()}));
+}
+
+#[test]
+fn test_header_two() {
+    assert_eq!(find_content_title("## My Title"), None);
+}
+
+#[test]
+fn test_hash_tag() {
+    assert_eq!(find_content_title("#My Title"), None);
+}
+
+fn read_file(path: &str) -> Option<Note> {
+    println!("Reading file: {}", path);
+
+    // read file contents into a string
+    let content = fs::read_to_string(path).expect("Something went wrong reading the file");
+
+    match find_content_title(&content) {
+        Some(note) => {
+            println!("Found a title in the content: {}", note.title);
+            return Some(note);
+        },
+        None => {
+            // get file name from path
+            let file_name = 
+                std::path::Path::new(path)
+                    .file_name().expect("Could not get file name")
+                    .to_str().expect("Could not convert to string.");
+            let end = file_name.len() - ".txt".len();
+            let t = file_name[..end].to_string();
+            println!("No title found, using the original one: {}", t);
+            Some(Note{title: t, content: content})
+        }
+    }
+
+    
 }
 
 /// Compare content and handle cases where the file has already been moved before.
@@ -192,6 +231,8 @@ fn write_file(path: &str, title: &str, contents: &str) {
     let full_path = format!("{}{}.md", path, check_title_chars(title));
     println!("Writing file: {}", full_path);
 
+    // TODO: Refactor append logic to be more testable.
+
     // check if the file already exists and append if so.
     if std::path::Path::new(&full_path).exists() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
@@ -212,31 +253,73 @@ fn write_file(path: &str, title: &str, contents: &str) {
     }
 }
 
-fn main() {
-    // get the command line arguments
-    let args: Vec<String> = std::env::args().skip(1).collect();
+#[derive(PartialEq, Debug)]
+struct Arguments {
+    input: String,
+    output: String,
+}
 
+fn args_to_arguments(args: Vec<String>) -> Option<Arguments> {
     match args.as_slice() {
         [input, output] => {
             match (valid_dir(input), valid_dir(output)) {
                 (Some(input), Some(_output)) => {
-                    let files = read_dir(&input);
-                    let notes = files.iter().map(|file| {
-                        read_file(&file)
-                    }).collect::<Vec<_>>();
-                    for note in notes {
-                        match note {
-                            Some(note) => {
-                                write_file(&output, &note.title, &note.content);
-                            },
-                            None => ()
-                        }
-                    }
+                    let ret = Arguments{input: input.to_string(), output: output.to_string()};
+                    Some(ret)
                 },
-                _ => ()
+                _ => None
             }
         },
-        _ => {
+        _ => None
+    }
+}
+
+#[test]
+fn test_too_few_args() {
+    let args = vec!["input".to_string()];
+    assert_eq!(args_to_arguments(args), None);
+}
+
+#[test]
+fn test_too_many_args() {
+    let args = vec!["input".to_string(), "output".to_string(), "extra".to_string()];
+    assert_eq!(args_to_arguments(args), None);
+}
+
+#[test]
+fn test_non_directory_args() {
+    let args = vec!["input".to_string(), "output".to_string()];
+    assert_eq!(args_to_arguments(args), None);
+}
+
+#[test]
+fn test_directory_args() {
+    let args = vec!["src".to_string(), "resources".to_string()];
+    assert_eq!(args_to_arguments(args), Some(Arguments{input: "src".to_string(), output: "resources".to_string()}));
+}
+
+fn main() {
+    // interperet the command line arguments
+    match args_to_arguments(std::env::args().skip(1).collect()) {
+        // We found a simple job.
+        Some(Arguments{input, output}) => {
+            // Read the input directory and iterate over the text files within it.
+            read_dir(&input).iter()
+            // Convert the file to a note. 
+            .map(|file| {
+                read_file(&file)
+            })
+            // If a valid note was found, then write it to the output directory.
+            .for_each(|note| {
+                match note {
+                    Some(note) => {
+                        write_file(&output, &note.title, &note.content);
+                    },
+                    None => ()
+                }
+            });
+        },
+        None => {
             println!("Usage: ./freesync2 <input> <output>");
         }
     }
