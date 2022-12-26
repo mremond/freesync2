@@ -21,6 +21,28 @@ fn valid_dir(path: &str) -> Option<String> {
     }
 }
 
+// Test known directories are valid.
+#[test]
+fn test_valid_dir() {
+    assert_eq!(valid_dir("/"), Some("/".to_string()));
+    assert_eq!(valid_dir("src"), Some("src".to_string()));
+    assert_eq!(valid_dir("/tmp"), Some("/tmp".to_string()));
+    assert_eq!(valid_dir("resources"), Some("resources".to_string()));
+}
+
+#[test]
+fn test_files_not_dir() {
+    assert_eq!(valid_dir("Cargo.toml"), None);
+    assert_eq!(valid_dir("src/main.rs"), None);
+    assert_eq!(valid_dir("resources/hello_world.txt"), None);
+}
+
+#[test]
+fn test_missing_dir() {
+    assert_eq!(valid_dir("/missing"), None);
+    assert_eq!(valid_dir("missing"), None);
+}
+
 // Read all files in a directory and return them if they are a file and text in the txt extension.
 fn read_dir(path: &str) -> Vec<String> {
     println!("Reading files in directory: {}", path);
@@ -88,6 +110,12 @@ fn read_file(path: &str) -> Option<Note> {
     Some(Note{title: t, content: content})
 }
 
+/// Compare content and handle cases where the file has already been moved before.
+/// 
+///     assert_eq!(content_diff("A", "A"), None);
+///     assert_eq!(content_diff("A", "A\nB"), Some("A\nB".to_string()));
+///     assert_eq!(content_diff("A\nB", "A"), Some("A\nB".to_string()));
+///     assert_eq!(content_diff("A", "B"), Some("A\nB".to_string()));
 fn content_diff(old: &str, new: &str) -> Option<String> {
     if old.contains(new) {
         println!("Content already exists, skipping.");
@@ -101,6 +129,32 @@ fn content_diff(old: &str, new: &str) -> Option<String> {
     }
 }
 
+#[test]
+fn test_content_skip() {
+    let old = "Hello World";
+    let new = "Hello World";
+    assert_eq!(content_diff(old, new), None);
+}
+
+#[test]
+fn test_extra_content() {
+    let old = "Hello World";
+    let new = "Hello World\nThis is a new line";
+    assert_eq!(content_diff(old, new), Some(new.to_string()));
+}
+
+#[test]
+fn test_appended_content() {
+    let old = "Hello World";
+    let new = "This is totally new content!";
+    assert_eq!(content_diff(old, new), Some(format!("{}\n{}", old, new)));
+}
+
+/// Remove the characters that Obsidian doesn't like in the title.
+/// 
+///     assert_eq!(check_title_chars("Hello World"), "Hello World");
+///     assert_eq!(check_title_chars("Hello*World"), "Hello_World");
+/// 
 fn check_title_chars(title: &str) -> String {
     title.replace("*", "_")
          .replace("\"", "_")
@@ -112,6 +166,25 @@ fn check_title_chars(title: &str) -> String {
          .replace(":", "_")
          .replace("|", "_")
          .replace("?", "_")
+}
+
+#[test]
+fn test_check_title_chars() {
+    // A couple strings that it should not change
+    assert_eq!(check_title_chars("Hello World"), "Hello World");
+    assert_eq!(check_title_chars("Hello_World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello-World"), "Hello-World");
+
+    // All the strings that it should change.
+    assert_eq!(check_title_chars("Hello*World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello\"World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello\\World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello/World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello<World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello>World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello:World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello|World"), "Hello_World");
+    assert_eq!(check_title_chars("Hello?World"), "Hello_World");
 }
 
 // output a new file base on path, filename, and contents
