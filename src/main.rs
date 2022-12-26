@@ -70,8 +70,6 @@ fn read_file(path: &str) -> Option<Note> {
             let t = first_line[2..].to_string();
             println!("Found a title: {}", t);
 
-            // TODO: check if the title is a valid regex.
-
             return Some(Note{                
                 title: t,
                 content: lines[1..].join("\n")
@@ -79,11 +77,10 @@ fn read_file(path: &str) -> Option<Note> {
         }
     }
 
-    // TODO: This creates endless files. Use the original file name instead.
-
     // get file name from path
     let file_name = 
-        std::path::Path::new(path).file_name().expect("Could not get file name")
+        std::path::Path::new(path)
+            .file_name().expect("Could not get file name")
             .to_str().expect("Could not convert to string.");
     let end = file_name.len() - ".txt".len();
     let t = file_name[..end].to_string();
@@ -91,17 +88,43 @@ fn read_file(path: &str) -> Option<Note> {
     Some(Note{title: t, content: content})
 }
 
+fn content_diff(old: &str, new: &str) -> Option<String> {
+    if old.contains(new) {
+        println!("Content already exists, skipping.");
+        None
+    } else if new.contains(old) {
+        println!("New content contains the old content, replacing.");
+        Some(new.to_string())
+    } else {
+        println!("New and old are different. Appending new content to the old.");
+        Some(format!("{}\n{}", old, new))
+    }
+}
+
 // output a new file base on path, filename, and contents
 fn write_file(path: &str, title: &str, contents: &str) {
+    // TODO: If the title has invalid characters, replace them with an underscore.
     let full_path = format!("{}{}.md", path, title);
     println!("Writing file: {}", full_path);
 
-    // TODO: check if the file already exists and append if so.
-
-    match fs::write(full_path, contents) {
-        Ok(_) => println!("File written successfully"),
-        Err(err) => println!("Error: {}", err)
-    };
+    // check if the file already exists and append if so.
+    if std::path::Path::new(&full_path).exists() {
+        let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
+        match content_diff(&old, contents) {
+            Some(contents) => {
+                match fs::write(full_path, contents) {
+                    Ok(_) => println!("File written successfully"),
+                    Err(err) => println!("Error: {}", err)
+                };
+            },
+            None => ()
+        }
+    } else {
+        match fs::write(full_path, contents) {
+            Ok(_) => println!("File written successfully"),
+            Err(err) => println!("Error: {}", err)
+        };
+    }
 }
 
 fn main() {
