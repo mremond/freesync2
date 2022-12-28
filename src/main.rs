@@ -123,13 +123,16 @@ struct Note {
 fn find_content_title(content: &str) -> Option<Note> {
     let lines: Vec<&str> = content.lines().collect();
     if let Some(first_line) = lines.first() {
-        if first_line.starts_with("# ") {
+        // Match the pattern, markdown title then a blank line then some content.        
+        if first_line.starts_with("# ") &&
+           lines.len() > 2 &&
+           lines[1].trim().is_empty() {
             let t = first_line[2..].to_string();
             println!("Found a title: {}", t);
 
             return Some(Note{                
                 title: t,
-                content: lines[1..].join("\n")
+                content: lines[2..].join("\n").trim().to_string()
             })
         }
     }
@@ -143,23 +146,28 @@ fn test_blank_content() {
 
 #[test]
 fn test_no_title() {
-    assert_eq!(find_content_title("Hello World"), None);
+    assert_eq!(find_content_title("Hello World\n\nContent"), None);
 }
 
 #[test]
-fn test_title() {
-    assert_eq!(find_content_title("# My Title"), Some(Note{title: "My Title".to_string(), content: "".to_string()}));
-    assert_eq!(find_content_title("# My Title\nAnd my content."), Some(Note{title: "My Title".to_string(), content: "And my content.".to_string()}));
+fn test_missing_blank_line() {
+    assert_eq!(find_content_title("# My Title"), None);
+    assert_eq!(find_content_title("# My Title\nContent"), None);
 }
 
 #[test]
 fn test_header_two() {
-    assert_eq!(find_content_title("## My Title"), None);
+    assert_eq!(find_content_title("## My Title\n\ncontent"), None);
 }
 
 #[test]
 fn test_hash_tag() {
-    assert_eq!(find_content_title("#My Title"), None);
+    assert_eq!(find_content_title("#My Title\n\ncontent"), None);
+}
+
+#[test]
+fn test_correct_syntax() {
+    assert_eq!(find_content_title("# My Title\n\nAnd my content."), Some(Note{title: "My Title".to_string(), content: "And my content.".to_string()}));
 }
 
 fn read_file(path: &str) -> Option<Note> {
@@ -173,16 +181,10 @@ fn read_file(path: &str) -> Option<Note> {
             println!("Found a title in the content: {}", note.title);
             return Some(note);
         },
+        // Default titles caused issues, so only create a note if properly formated for a title.
         None => {
-            // get file name from path
-            let file_name = 
-                std::path::Path::new(path)
-                    .file_name().expect("Could not get file name")
-                    .to_str().expect("Could not convert to string.");
-            let end = file_name.len() - ".txt".len();
-            let t = file_name[..end].to_string();
-            println!("No title found, using the original one: {}", t);
-            Some(Note{title: t, content: content})
+            println!("No title found in content for file: {}", path);
+            None
         }
     } 
 }

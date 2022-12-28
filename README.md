@@ -7,6 +7,14 @@ A personal utility to move files from my [freewrite](https://getfreewrite.com) t
 ./freesync2 <input> <output>
 ```
 
+## Syntax
+Notes need to have a valid title which can be used in the Obsidian Vault, which can be included as:
+```
+# Title
+
+With a blank line before this content. Missing title, wrong header level, no blank line, or no content will be skipped.
+```
+
 ## Deploy
 ```
 cargo build --release
