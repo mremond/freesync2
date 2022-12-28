@@ -74,6 +74,46 @@ fn read_dir(path: &str) -> Vec<String> {
     files
 }
 
+fn valid_file(path: &str) -> Option<String> {
+    println!("Checking path: {}", path);
+    match fs::metadata(path) {
+        Ok(metadata) => {
+            if metadata.is_file() {
+                println!("Path is a file");
+                Some(path.to_string())
+            } else {
+                println!("Path is not a file");
+                None
+            }
+        },
+        Err(err) => {
+            println!("Error: {}", err);
+            None
+        }
+    }
+}
+
+#[test]
+fn test_valid_file() {
+    assert_eq!(valid_file("Cargo.toml"), Some("Cargo.toml".to_string()));
+    assert_eq!(valid_file("src/main.rs"), Some("src/main.rs".to_string()));
+    assert_eq!(valid_file("resources/hello_world.txt"), Some("resources/hello_world.txt".to_string()));
+}
+
+#[test]
+fn test_dirs_not_file() {
+    assert_eq!(valid_file("/"), None);
+    assert_eq!(valid_file("src"), None);
+    assert_eq!(valid_file("/tmp"), None);
+    assert_eq!(valid_file("resources"), None);
+}
+
+#[test]
+fn test_missing_file() {
+    assert_eq!(valid_file("/missing.txt"), None);
+    assert_eq!(valid_file("missing.txt"), None);
+}
+
 #[derive(PartialEq, Debug)]
 struct Note {
     title: String,
@@ -144,9 +184,7 @@ fn read_file(path: &str) -> Option<Note> {
             println!("No title found, using the original one: {}", t);
             Some(Note{title: t, content: content})
         }
-    }
-
-    
+    } 
 }
 
 /// Compare content and handle cases where the file has already been moved before.
@@ -226,12 +264,41 @@ fn test_check_title_chars() {
     assert_eq!(check_title_chars("Hello?World"), "Hello_World");
 }
 
-// output a new file base on path, filename, and contents
-fn write_file(path: &str, title: &str, contents: &str) {
-    let full_path = format!("{}{}.md", path, check_title_chars(title));
+// Output a new file base on path, filename, and contents Returns the 
+// title of the file if it was written successfully for futher processing.
+fn write_file(path: &str, title: &str, contents: &str) -> Option<String> {
+    let title = check_title_chars(title);
+    let full_path = format!("{}{}.md", path, title);
     println!("Writing file: {}", full_path);
     
     // check if the file already exists and append if so.
+    if std::path::Path::new(&full_path).exists() {
+        let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
+        match content_diff(&old, contents) {
+            Some(contents) => {
+                match fs::write(full_path, contents) {
+                    Ok(_) => {
+                        println!("File written successfully");
+                        return Some(title);
+                    },
+                    Err(err) => println!("Error: {}", err)
+                };
+            },
+            None => ()
+        }
+    } else {
+        match fs::write(full_path, contents) {
+            Ok(_) => {
+                println!("File written successfully");
+                return Some(title);
+            },
+            Err(err) => println!("Error: {}", err)
+        };
+    }
+    None
+}
+
+fn append_to_file(full_path: &str, contents: &str) {
     if std::path::Path::new(&full_path).exists() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
         match content_diff(&old, contents) {
@@ -244,10 +311,7 @@ fn write_file(path: &str, title: &str, contents: &str) {
             None => ()
         }
     } else {
-        match fs::write(full_path, contents) {
-            Ok(_) => println!("File written successfully"),
-            Err(err) => println!("Error: {}", err)
-        };
+        println!("File expected to exists for append: {}", full_path);
     }
 }
 
@@ -255,14 +319,28 @@ fn write_file(path: &str, title: &str, contents: &str) {
 struct Arguments {
     input: String,
     output: String,
+    alias: Option<String>
 }
 
 fn args_to_arguments(args: Vec<String>) -> Option<Arguments> {
     match args.as_slice() {
         [input, output] => {
             match (valid_dir(input), valid_dir(output)) {
-                (Some(input), Some(_output)) => {
-                    let ret = Arguments{input: input.to_string(), output: output.to_string()};
+                (Some(_), Some(_)) => {
+                    let ret = Arguments{input: input.to_string(), 
+                                                   output: output.to_string(), 
+                                                   alias: None};
+                    Some(ret)
+                },
+                _ => None
+            }
+        },
+        [input, output, alias] => {
+            match (valid_dir(input), valid_dir(output), valid_file(alias)) {
+                (Some(_), Some(_), Some(_)) => {
+                    let ret = Arguments{input: input.to_string(), 
+                                                   output: output.to_string(), 
+                                                   alias: Some(alias.to_string())};
                     Some(ret)
                 },
                 _ => None
@@ -280,7 +358,7 @@ fn test_too_few_args() {
 
 #[test]
 fn test_too_many_args() {
-    let args = vec!["input".to_string(), "output".to_string(), "extra".to_string()];
+    let args = vec!["input".to_string(), "output".to_string(), "alias".to_string(), "extra".to_string()];
     assert_eq!(args_to_arguments(args), None);
 }
 
@@ -293,32 +371,68 @@ fn test_non_directory_args() {
 #[test]
 fn test_directory_args() {
     let args = vec!["src".to_string(), "resources".to_string()];
-    assert_eq!(args_to_arguments(args), Some(Arguments{input: "src".to_string(), output: "resources".to_string()}));
+    assert_eq!(args_to_arguments(args), Some(Arguments{input: "src".to_string(), output: "resources".to_string(), alias: None}));
+}
+
+#[test]
+fn test_alias_args() {
+    let args = vec!["src".to_string(), "resources".to_string(), "alias".to_string()];
+    assert_eq!(args_to_arguments(args), Some(Arguments{input: "src".to_string(), output: "resources".to_string(), alias: Some("alias".to_string())}));
+}
+
+fn move_files(input: &str, output: &str) -> Vec<String> {
+    // Read the input directory and iterate over the text files within it.
+    read_dir(&input).iter()
+    // Convert the file to a note. 
+    .map(|file| {
+        read_file(&file)
+    })
+    // If a valid note was found, then write it to the output directory.
+    .map(|note| {
+        match note {
+            Some(note) => {
+                match write_file(&output, &note.title, &note.content) {
+                    Some(title) => return title,
+                    None => ()
+                };
+            },
+            None => ()
+        };
+        "".to_string()
+    })
+    .filter(|title| title != "")
+    .collect()
 }
 
 fn main() {
     // interperet the command line arguments
     match args_to_arguments(std::env::args().skip(1).collect()) {
         // We found a simple job.
-        Some(Arguments{input, output}) => {
-            // Read the input directory and iterate over the text files within it.
-            read_dir(&input).iter()
-            // Convert the file to a note. 
-            .map(|file| {
-                read_file(&file)
-            })
-            // If a valid note was found, then write it to the output directory.
-            .for_each(|note| {
-                match note {
-                    Some(note) => {
-                        write_file(&output, &note.title, &note.content);
-                    },
-                    None => ()
+        Some(Arguments{input, output, alias}) => {
+            match alias {
+                None => {
+                    let _ = move_files(&input, &output);
+                },
+                Some(alias) => {
+                    match valid_file(&alias) {
+                        Some(_) => {
+                            move_files(&input, &output).iter()
+                            .for_each(|title| {
+                                println!("Appending to alias file: {}", title);
+                                let block = format!("----\n\n![[{}]]\n\n", title);
+                                append_to_file(&alias, &block);
+                            });
+                        },
+                        None => ()
+                    }
                 }
-            });
+            }
         },
         None => {
-            println!("Usage: ./freesync2 <input> <output>");
+            println!("Usage: ./freesync2 <input> <output> [alias]");
+            println!("input: must be a valid directory containing text files");
+            println!("output: must be a valid directory");
+            println!("alias: (if present) must be a valid file which already exists");
         }
     }
 }
