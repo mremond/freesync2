@@ -23,7 +23,7 @@ fn args_to_arguments(args: Vec<String>) -> Option<Arguments> {
             }
         },
         [input, output, alias] => {
-            match (io::Dir::new_valid(input), io::Dir::new_valid(output), io::valid_file(alias)) {
+            match (io::Dir::new_valid(input), io::Dir::new_valid(output), io::File::new_valid(alias)) {
                 (Some(_), Some(_), Some(_)) => {
                     let ret = Arguments{input: input.to_string(), 
                                                    output: output.to_string(), 
@@ -68,19 +68,25 @@ fn test_alias_args() {
 }
 
 fn move_files(input: &str, output: &str) -> Vec<String> {
+    let in_dir = io::Dir::new_valid(input).expect("Expct that the input directory is valid.");
+    let out_dir = io::Dir::new_valid(output).expect("Expected that the output directory is valid.");
+
     // Read the input directory and iterate over the text files within it.
-    io::read_dir(&input).iter()
+    in_dir.list_text_files().iter()
     // Convert the file to a note. 
     .map(|file| {
-        io::read_file(&file)
+        io::File::new_valid(file).expect("Expected valid file.").read_note()
     })
     // If a valid note was found, then write it to the output directory.
     .map(|note| {
         match note {
             Some(note) => {
-                match note.write_file(&output) {
-                    Some(alias) => return alias,
-                    None => ()
+                match out_dir.put_note(&note) {
+                    Ok(Some(alias)) => return alias,
+                    Ok(None) => (),
+                    Err(err) => {
+                        println!("Error: {}", err);
+                    }
                 };
             },
             None => ()
@@ -94,24 +100,23 @@ fn move_files(input: &str, output: &str) -> Vec<String> {
 fn main() {
     // interperet the command line arguments
     match args_to_arguments(std::env::args().skip(1).collect()) {
-        // We found a simple job.
         Some(Arguments{input, output, alias}) => {
             match alias {
                 None => {
+                    // No alias provided so do the simple move.
                     let _ = move_files(&input, &output);
                 },
                 Some(alias) => {
-                    match io::valid_file(&alias) {
-                        Some(_) => {
-                            move_files(&input, &output).iter()
-                            .for_each(|title| {
-                                println!("Appending to alias file: {}", title);
-                                let block = format!("----\n\n![[{}]]\n\n", title);
-                                io::append_to_file(&alias, &block);
-                            });
-                        },
-                        None => ()
-                    }
+                    let file = io::File::new_valid(&alias).expect("Alias file should be valid.");
+
+                    // Do the normal move, but this time iterate the aliases returned
+                    move_files(&input, &output).iter()
+                        .for_each(|title| {
+                            // and put them as embeds in the alias file.
+                            println!("Appending to alias file: {}", title);
+                            let block = format!("----\n\n![[{}]]\n\n", title);
+                            file.put_content(&block);
+                        });
                 }
             }
         },

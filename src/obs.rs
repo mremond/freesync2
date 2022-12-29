@@ -1,9 +1,7 @@
-use crate::io;
-
 #[derive(PartialEq, Debug, Clone)]
 pub struct Note {
-    title: String,
-    content: String
+    pub title: String,
+    pub content: String
 }
 
 impl Note {
@@ -28,9 +26,6 @@ impl Note {
             }
         }
         None
-    }
-    pub fn write_file(self, path: &str) -> Option<String>{
-        io::write_file(path, &self.title, &self.content)
     }
 }
 
@@ -104,7 +99,7 @@ fn test_check_title_chars() {
 }
 
 // Replace characters that are hard to type on the freewrite.
-pub fn replace_chars(contents: &str) -> String {
+fn replace_chars(contents: &str) -> String {
     contents.replace("---", "—")
             .replace("--", "–")
 }
