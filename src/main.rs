@@ -266,17 +266,32 @@ fn test_check_title_chars() {
     assert_eq!(check_title_chars("Hello?World"), "Hello_World");
 }
 
+// Replace characters that are hard to type on the freewrite.
+fn replace_chars(contents: &str) -> String {
+    contents.replace("---", "—")
+            .replace("--", "–")
+}
+
+#[test]
+fn test_replace_chars() {
+    assert_eq!(replace_chars("hyphen-stays"), "hyphen-stays");
+    assert_eq!(replace_chars("en--dash"), "en–dash");
+    assert_eq!(replace_chars("em---dash"), "em—dash");
+}
+
 // Output a new file base on path, filename, and contents Returns the 
 // title of the file if it was written successfully for futher processing.
 fn write_file(path: &str, title: &str, contents: &str) -> Option<String> {
     let title = check_title_chars(title);
+    let contents = replace_chars(contents);
+
     let full_path = format!("{}{}.md", path, title);
     println!("Writing file: {}", full_path);
     
     // check if the file already exists and append if so.
     if std::path::Path::new(&full_path).exists() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
-        match content_diff(&old, contents) {
+        match content_diff(&old, &contents) {
             Some(contents) => {
                 match fs::write(full_path, contents) {
                     Ok(_) => {
