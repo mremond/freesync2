@@ -1,9 +1,32 @@
 use crate::obs;
-use crate::obs::Diffable;
+use crate::diff::Diffable;
 use std::fs;
 
+pub struct Dir {
+    path: String
+}
+
+impl Dir {
+    pub fn new_valid(path: &str) -> Option<Dir> {
+        match valid_dir(path) {
+            Some(path) => Some(Dir{path: path}),
+            None => None
+        }
+    }
+}
+
+trait Notate {
+    fn notate(&self, note: &obs::Note) -> Result<Option<String>, std::io::Error>;
+}
+
+impl Notate for Dir {
+    fn notate(&self, note: &obs::Note) -> Result<Option<String>, std::io::Error> {
+        Ok(note.clone().write_file(&self.path))
+    }
+}
+
 // Take a path and check if it points to a valid directory.
-pub fn valid_dir(path: &str) -> Option<String> {
+fn valid_dir(path: &str) -> Option<String> {
     println!("Checking path: {}", path);
     let metadata = fs::metadata(path);
     match metadata {

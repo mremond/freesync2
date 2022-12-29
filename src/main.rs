@@ -1,3 +1,4 @@
+mod diff;
 mod io;
 mod obs;
 
@@ -11,7 +12,7 @@ struct Arguments {
 fn args_to_arguments(args: Vec<String>) -> Option<Arguments> {
     match args.as_slice() {
         [input, output] => {
-            match (io::valid_dir(input), io::valid_dir(output)) {
+            match (io::Dir::new_valid(input), io::Dir::new_valid(output)) {
                 (Some(_), Some(_)) => {
                     let ret = Arguments{input: input.to_string(), 
                                                    output: output.to_string(), 
@@ -22,7 +23,7 @@ fn args_to_arguments(args: Vec<String>) -> Option<Arguments> {
             }
         },
         [input, output, alias] => {
-            match (io::valid_dir(input), io::valid_dir(output), io::valid_file(alias)) {
+            match (io::Dir::new_valid(input), io::Dir::new_valid(output), io::valid_file(alias)) {
                 (Some(_), Some(_), Some(_)) => {
                     let ret = Arguments{input: input.to_string(), 
                                                    output: output.to_string(), 
