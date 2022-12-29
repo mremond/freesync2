@@ -1,57 +1,69 @@
+use crate::io;
+
 #[derive(PartialEq, Debug)]
 pub struct Note {
-    pub title: String,
-    pub content: String
+    title: String,
+    content: String
 }
 
-pub fn find_content_title(content: &str) -> Option<Note> {
-    let lines: Vec<&str> = content.lines().collect();
-    if let Some(first_line) = lines.first() {
-        // Match the pattern, markdown title then a blank line then some content.        
-        if first_line.starts_with("# ") &&
-           lines.len() > 2 &&
-           lines[1].trim().is_empty() {
-            let t = first_line[2..].to_string();
-            println!("Found a title: {}", t);
-
-            return Some(Note{                
-                title: t,
-                content: lines[2..].join("\n").trim().to_string()
-            })
-        }
+impl Note {
+    pub fn new(title: String, content: String) -> Note {
+        Note{title: check_title_chars(&title), 
+             content: replace_chars(&content)}
     }
-    None
+    pub fn parse(content: &str) -> Option<Note> {
+        let lines: Vec<&str> = content.lines().collect();
+        if let Some(first_line) = lines.first() {
+            // Match the pattern, markdown title then a blank line then some content.        
+            if first_line.starts_with("# ") &&
+            lines.len() > 2 &&
+            lines[1].trim().is_empty() {
+                let t = first_line[2..].to_string();
+                println!("Found a title: {}", t);
+
+                return Some(Note::new(
+                    t,
+                    lines[2..].join("\n").trim().to_string()
+                ))
+            }
+        }
+        None
+    }
+    pub fn write_file(self, path: &str) -> Option<String>{
+        io::write_file(path, &self.title, &self.content)
+    }
 }
 
 #[test]
 fn test_blank_content() {
-    assert_eq!(find_content_title(""), None);
+    assert_eq!(Note::parse(""), None);
 }
 
 #[test]
 fn test_no_title() {
-    assert_eq!(find_content_title("Hello World\n\nContent"), None);
+    assert_eq!(Note::parse("Hello World\n\nContent"), None);
 }
 
 #[test]
 fn test_missing_blank_line() {
-    assert_eq!(find_content_title("# My Title"), None);
-    assert_eq!(find_content_title("# My Title\nContent"), None);
+    assert_eq!(Note::parse("# My Title"), None);
+    assert_eq!(Note::parse("# My Title\nContent"), None);
 }
 
 #[test]
 fn test_header_two() {
-    assert_eq!(find_content_title("## My Title\n\ncontent"), None);
+    assert_eq!(Note::parse("## My Title\n\ncontent"), None);
 }
 
 #[test]
 fn test_hash_tag() {
-    assert_eq!(find_content_title("#My Title\n\ncontent"), None);
+    assert_eq!(Note::parse("#My Title\n\ncontent"), None);
 }
 
 #[test]
 fn test_correct_syntax() {
-    assert_eq!(find_content_title("# My Title\n\nAnd my content."), Some(Note{title: "My Title".to_string(), content: "And my content.".to_string()}));
+    assert_eq!(Note::parse("# My Title\n\nAnd my content."), 
+               Some(Note::new("My Title".to_string(), "And my content.".to_string())));
 }
 
 /// Compare content and handle cases where the file has already been moved before.
@@ -60,7 +72,7 @@ fn test_correct_syntax() {
 ///     assert_eq!(content_diff("A", "A\nB"), Some("A\nB".to_string()));
 ///     assert_eq!(content_diff("A\nB", "A"), Some("A\nB".to_string()));
 ///     assert_eq!(content_diff("A", "B"), Some("A\nB".to_string()));
-pub fn content_diff(old: &str, new: &str) -> Option<String> {
+fn content_diff(old: &str, new: &str) -> Option<String> {
     if old.contains(new) {
         println!("Content already exists, skipping.");
         None
@@ -72,6 +84,16 @@ pub fn content_diff(old: &str, new: &str) -> Option<String> {
         Some(format!("{}\n{}", old, new))
     }
 }
+pub trait Diffable {
+    fn diff(self, other: &str) -> Option<String>;
+}
+
+impl Diffable for String {
+    fn diff(self, other: &str) -> Option<String> {
+        content_diff(&self, other)
+    }
+}
+
 
 #[test]
 fn test_content_skip() {
@@ -99,7 +121,7 @@ fn test_appended_content() {
 ///     assert_eq!(check_title_chars("Hello World"), "Hello World");
 ///     assert_eq!(check_title_chars("Hello*World"), "Hello_World");
 /// 
-pub fn check_title_chars(title: &str) -> String {
+fn check_title_chars(title: &str) -> String {
     title.replace("*", "_")
          .replace("\"", "_")
          .replace("\\", "_")
@@ -113,7 +135,7 @@ pub fn check_title_chars(title: &str) -> String {
 }
 
 #[test]
-pub fn test_check_title_chars() {
+fn test_check_title_chars() {
     // A couple strings that it should not change
     assert_eq!(check_title_chars("Hello World"), "Hello World");
     assert_eq!(check_title_chars("Hello_World"), "Hello_World");

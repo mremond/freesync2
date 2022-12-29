@@ -77,8 +77,8 @@ fn move_files(input: &str, output: &str) -> Vec<String> {
     .map(|note| {
         match note {
             Some(note) => {
-                match io::write_file(&output, &note.title, &note.content) {
-                    Some(title) => return title,
+                match note.write_file(&output) {
+                    Some(alias) => return alias,
                     None => ()
                 };
             },
@@ -86,7 +86,7 @@ fn move_files(input: &str, output: &str) -> Vec<String> {
         };
         "".to_string()
     })
-    .filter(|title| title != "")
+    .filter(|alias| alias != "")
     .collect()
 }
 

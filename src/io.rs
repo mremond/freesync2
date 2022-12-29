@@ -1,4 +1,5 @@
 use crate::obs;
+use crate::obs::Diffable;
 use std::fs;
 
 // Take a path and check if it points to a valid directory.
@@ -121,9 +122,9 @@ pub fn read_file(path: &str) -> Option<obs::Note> {
     // read file contents into a string
     let content = fs::read_to_string(path).expect("Something went wrong reading the file");
 
-    match obs::find_content_title(&content) {
+    match obs::Note::parse(&content) {
         Some(note) => {
-            println!("Found a title in the content: {}", note.title);
+            println!("Found a title in the content.");
             return Some(note);
         },
         // Default titles caused issues, so only create a note if properly formated for a title.
@@ -137,21 +138,18 @@ pub fn read_file(path: &str) -> Option<obs::Note> {
 // Output a new file base on path, filename, and contents Returns the 
 // title of the file if it was written successfully for futher processing.
 pub fn write_file(path: &str, title: &str, contents: &str) -> Option<String> {
-    let title = obs::check_title_chars(title);
-    let contents = obs::replace_chars(contents);
-
     let full_path = format!("{}{}.md", path, title);
     println!("Writing file: {}", full_path);
     
     // check if the file already exists and append if so.
     if std::path::Path::new(&full_path).exists() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
-        match obs::content_diff(&old, &contents) {
+        match old.diff(&contents) {
             Some(contents) => {
                 match fs::write(full_path, contents) {
                     Ok(_) => {
                         println!("File written successfully");
-                        return Some(title);
+                        return Some(title.to_owned());
                     },
                     Err(err) => println!("Error: {}", err)
                 };
@@ -161,8 +159,8 @@ pub fn write_file(path: &str, title: &str, contents: &str) -> Option<String> {
     } else {
         match fs::write(full_path, contents) {
             Ok(_) => {
-                println!("File written successfully");
-                return Some(title);
+                println!("New file written successfully");
+                return Some(title.to_owned());
             },
             Err(err) => println!("Error: {}", err)
         };
@@ -173,7 +171,7 @@ pub fn write_file(path: &str, title: &str, contents: &str) -> Option<String> {
 pub fn append_to_file(full_path: &str, contents: &str) {
     if std::path::Path::new(&full_path).exists() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
-        match obs::content_diff(&old, contents) {
+        match old.diff(&contents) {
             Some(contents) => {
                 match fs::write(full_path, contents) {
                     Ok(_) => println!("File written successfully"),
