@@ -21,7 +21,7 @@ impl Dir {
         };
         println!("Writing file: {}", full_path);
         
-        write_file(&self.path, &note.title, &note.content)
+        write_file(&full_path, &note.title, &note.content);
     }
     pub fn list_text_files(&self) -> Vec<String> {
         read_dir(&self.path)
@@ -106,7 +106,7 @@ fn read_dir(path: &str) -> Vec<String> {
 // file if it was written successfully for use as an alias.
 fn write_file(full_path: &str, title: &str, content: &str) -> Result<Option<String>, std::io::Error> {
 // check if the file already exists and append if so.
-    if std::path::Path::new(&full_path).exists() {
+    if std::path::Path::new(&full_path).is_file() {
         let old = fs::read_to_string(&full_path).expect("Something went wrong reading the file");
         match old.diff(content) {
             Some(contents) => {
